@@ -11,7 +11,7 @@ trait AsWord {
   fn as_word(&self) -> Result<Word, ()>;
 }
 
-impl AsWord for String {
+impl AsWord for &str {
   fn as_word(&self) -> Result<Word, ()> {
     let mut result = [0 as char; 5];
 
@@ -116,6 +116,78 @@ fn score_guess(target: &Word, guess: &Word) -> Row {
   result
 }
 
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  fn expect_score(target: &str, guess: &str, colors: Vec<Color>) {
+    let target = target.as_word().unwrap();
+    let guess = guess.as_word().unwrap();
+    let result = score_guess(&target, &guess);
+
+    assert_eq!(result.len(), 5);
+
+    for (i, square) in result.iter().enumerate() {
+      assert_eq!(square.color, colors[i]);
+    }
+  }
+
+  #[test]
+  fn correct_guess() {
+    expect_score("ARRAY", "ARRAY", vec![Color::Green; 5]);
+  }
+
+  #[test]
+  fn partial_green() {
+    expect_score(
+      "ARRAY",
+      "FURRY",
+      vec![
+        Color::Gray,
+        Color::Gray,
+        Color::Green,
+        Color::Yellow,
+        Color::Green,
+      ],
+    );
+  }
+
+  #[test]
+  fn partial_yellow() {
+    expect_score(
+      "ARRAY",
+      "METER",
+      vec![
+        Color::Gray,
+        Color::Gray,
+        Color::Gray,
+        Color::Gray,
+        Color::Yellow,
+      ],
+    );
+  }
+
+  #[test]
+  fn all_yellow() {
+    expect_score(
+      "SALES",
+      "ESSAL",
+      vec![
+        Color::Yellow,
+        Color::Yellow,
+        Color::Yellow,
+        Color::Yellow,
+        Color::Yellow,
+      ],
+    );
+  }
+
+  #[test]
+  fn all_gray() {
+    expect_score("ARRAY", "BLUNT", vec![Color::Gray; 5]);
+  }
+}
+
 fn load_wordlist(path: &str) -> Vec<String> {
   let file = fs::read_to_string(path).expect("Could not open wordlist");
 
@@ -147,23 +219,18 @@ fn main() {
   let allowed = load_wordlist("allowlist.json");
   let targetlist = load_wordlist("targetlist.json");
 
-  let mut target: Word;
-  let mut guess: Word;
-
-  let mut input: String;
-
   loop {
     println!("Welcome to WORDLE! Enter a five letter guess...");
 
-    target = targetlist
+    let target: Word = targetlist
       .choose(&mut rand::thread_rng())
       .unwrap()
-      .clone()
+      .as_str()
       .as_word()
       .expect("Wordlist yielded word of invalid length");
 
     loop {
-      input = prompt();
+      let input = prompt();
 
       if input.len() != 5 {
         println!("Please enter a five letter guess.");
@@ -180,7 +247,7 @@ fn main() {
         continue;
       }
 
-      guess = input.as_word().unwrap();
+      let guess: Word = input.as_str().as_word().unwrap();
 
       let scored = score_guess(&target, &guess);
       scored.print_wordle();
@@ -193,7 +260,7 @@ fn main() {
 
     println!("Play again? (y/n)");
 
-    input = prompt();
+    let input = prompt();
 
     if input.to_lowercase() == "n" {
       break;
